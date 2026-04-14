@@ -1,0 +1,55 @@
+name: Tistory 자동 포스팅
+
+on:
+  # 매주 월요일 오전 9시 (KST = UTC+9 → UTC 00:00)
+  schedule:
+    - cron: '0 0 * * 1'
+
+  # 수동 실행 (Actions 탭에서 직접 트리거 가능)
+  workflow_dispatch:
+    inputs:
+      post_title:
+        description: '포스팅 제목 (비워두면 기본값 사용)'
+        required: false
+        default: ''
+      post_tags:
+        description: '태그 (쉼표 구분)'
+        required: false
+        default: '자동화,Python,Playwright'
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Python 설정
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 의존성 설치
+        run: |
+          pip install playwright
+          playwright install --with-deps chromium
+
+      - name: 티스토리 포스팅 실행
+        env:
+          KAKAO_EMAIL: ${{ secrets.KAKAO_EMAIL }}
+          KAKAO_PASSWORD: ${{ secrets.KAKAO_PASSWORD }}
+          BLOG_NAME: ${{ secrets.BLOG_NAME }}
+          POST_TITLE: ${{ github.event.inputs.post_title }}
+          POST_TAGS: ${{ github.event.inputs.post_tags || '자동화,Python,Playwright' }}
+        run: python post_tistory.py
+
+      - name: 오류 스크린샷 업로드 (실패 시)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: error-screenshot
+          path: error_screenshot.png
+          retention-days: 3
